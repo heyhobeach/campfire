@@ -452,6 +452,8 @@ function triggerCinematicScroll(targetProg, duration = CINEMATIC_CONFIG.duration
 
 // Prevent native scroll to ensure cinematic sequence plays smoothly
 window.addEventListener('wheel', (e) => {
+    // 모바일 화면(너비 768px 이하)에서는 강제 스크롤 이벤트를 해제하고 자연스러운 네이티브 스크롤 허용
+    if (window.innerWidth <= 768) return;
     if (isCinematicScrolling) {
         e.preventDefault();
         return;
@@ -475,42 +477,7 @@ window.addEventListener('wheel', (e) => {
     }
 }, { passive: false });
 
-// ── Mobile Touch Support ──────────────────────────
-let touchStartY = 0;
-window.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-}, { passive: true });
 
-window.addEventListener('touchmove', (e) => {
-    // 애니메이션 진행 중에는 터치 스크롤 방지
-    if (isCinematicScrolling) e.preventDefault();
-}, { passive: false });
-
-window.addEventListener('touchend', (e) => {
-    if (isCinematicScrolling) return;
-
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaY = touchStartY - touchEndY; // 양수: 상단으로 밀기 (아래로 스크롤)
-
-    // 아주 짧은 터치는 무시
-    if (Math.abs(deltaY) < 40) return;
-
-    const sMax = scrollEl.scrollHeight - window.innerHeight;
-    if (sMax <= 0) return;
-
-    const currentProg = window.scrollY / sMax;
-    let nextProg;
-
-    if (deltaY > 0) {
-        nextProg = CINEMATIC_CONFIG.milestones.find(m => m > currentProg + 0.01);
-    } else {
-        nextProg = [...CINEMATIC_CONFIG.milestones].reverse().find(m => m < currentProg - 0.01);
-    }
-
-    if (nextProg !== undefined) {
-        triggerCinematicScroll(nextProg);
-    }
-}, { passive: true });
 
 // Make scroll hint clickable
 scrollHint?.addEventListener('click', () => {

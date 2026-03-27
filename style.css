@@ -596,7 +596,8 @@ header.warm .nav-links a:hover {
     gap: 12px;
     opacity: 0;
     animation: fadeSlideUp 1.2s 1.4s ease forwards;
-    cursor: pointer; /* Indicate clickability */
+    cursor: pointer;
+    /* Indicate clickability */
 }
 
 .scroll-hint span {
