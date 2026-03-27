@@ -178,7 +178,6 @@ function tick(now) {
     updateFocalStar(prog);
     updateFireScene(prog);
     updateHeader(prog);
-    updateRevealElements();
     drawCanvas(prog, now, dt);
 
     rafId = requestAnimationFrame(tick);
@@ -247,17 +246,24 @@ function updateHeader(p) {
     }
 }
 
-// ── Scroll-Reveal Elements ────────────────────────
+// ── Scroll-Reveal Elements (Intersection Observer) ──
 const revealEls = document.querySelectorAll('[data-reveal], .section-title, .section-body, .gathering-inner .section-title, .gathering-inner .section-body');
-function updateRevealElements() {
-    revealEls.forEach(el => {
-        const rect = el.getBoundingClientRect();
-        const inView = rect.top < window.innerHeight * 0.85 && rect.bottom > 0;
-        if (inView) {
-            el.classList.add('revealed');
+
+// 뷰포트에 요소가 15% 이상 들어왔을 때 애니메이션 실행
+const revealObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            observer.unobserve(entry.target); // 한 번만 실행
         }
     });
-}
+}, {
+    root: null,
+    rootMargin: '0px 0px -15% 0px',
+    threshold: 0
+});
+
+revealEls.forEach(el => revealObserver.observe(el));
 
 // ── Canvas Draw ───────────────────────────────────
 let emberSpawnTimer = 0;
@@ -363,11 +369,52 @@ function drawCanvas(p, now, dt) {
 
 // ── Cinematic Scroll Interaction Config ──────────
 const CINEMATIC_CONFIG = {
-    // 사용자의 요청대로 50% 이후 14, 14, 14, 12 퍼센트씩 내려가도록 설정
-    // 0 -> 50 -> 64 -> 78 -> 92 -> 100
-    milestones: [0, 0.5, 0.63, 0.75, 0.87, 1.0],
-    duration: 1600 // 각 단계별 이동 시간
+    milestones: [0, 0.5, 0.63, 0.75, 0.87, 1.0], // 로딩 시 계산됨
+    duration: 1600
 };
+
+// 해상도(QHD, FHD 등)에 따라 콘텐츠가 항상 모니터 한가운데 오도록 비율을 자동 재계산합니다.
+function refreshMilestones() {
+    const sMax = scrollEl.scrollHeight - window.innerHeight;
+    if (sMax <= 0) return;
+
+    const sections = [
+        '#hero-section',
+        '#gathering-section',
+        '#about-section',
+        '#features-section',
+        '#rules-section',
+        '#join-section'
+    ];
+
+    const newMilestones = sections.map((id, index) => {
+        // 첫 화면은 무조건 0으로 고정
+        if (index === 0) return 0;
+
+        const el = document.querySelector(id);
+        if (!el) return 0;
+
+        // 핵심: 우선 정중앙 정렬을 베이스로 합니다 (+60 여백이 과하게 위로 올려치는 원인이었으므로 제거)
+        let targetScroll = el.offsetTop - (window.innerHeight / 2) + (el.offsetHeight / 2);
+
+        // 마지막 최하단 스크롤(index 5)은 10% 아래로 배치
+        if (index === sections.length - 1) {
+            targetScroll -= (window.innerHeight * 0.10);
+        }
+        // 두 번째 스크롤(소개 챕터, index 2)부터 마지막 이전까지는 2% 아래로 배치
+        else if (index >= 2) {
+            targetScroll -= (window.innerHeight * 0.02);
+        }
+
+        return Math.max(0, Math.min(targetScroll / sMax, 1));
+    });
+
+    CINEMATIC_CONFIG.milestones = newMilestones;
+}
+
+window.addEventListener('resize', refreshMilestones);
+window.addEventListener('load', refreshMilestones);
+refreshMilestones();
 
 let isCinematicScrolling = false;
 function triggerCinematicScroll(targetProg, duration = CINEMATIC_CONFIG.duration) {
@@ -377,7 +424,6 @@ function triggerCinematicScroll(targetProg, duration = CINEMATIC_CONFIG.duration
     const scrollMax = scrollEl.scrollHeight - window.innerHeight;
     const targetScroll = Math.max(0, Math.min(scrollMax * targetProg, scrollMax));
 
-    // 이동할 거리가 너무 짧으면 무시
     if (Math.abs(currentScroll - targetScroll) < 10) return;
 
     isCinematicScrolling = true;
@@ -388,7 +434,6 @@ function triggerCinematicScroll(targetProg, duration = CINEMATIC_CONFIG.duration
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
 
-        // Easing function: easeInOutCubic
         const ease = progress < 0.5
             ? 4 * progress * progress * progress
             : 1 - Math.pow(-2 * progress + 2, 3) / 2;
@@ -407,8 +452,6 @@ function triggerCinematicScroll(targetProg, duration = CINEMATIC_CONFIG.duration
 
 // Prevent native scroll to ensure cinematic sequence plays smoothly
 window.addEventListener('wheel', (e) => {
-    // Always prevent native scroll when in the cinematic sections
-    // Or at least when we are triggering a milestone jump
     if (isCinematicScrolling) {
         e.preventDefault();
         return;
@@ -427,7 +470,7 @@ window.addEventListener('wheel', (e) => {
     }
 
     if (nextProg !== undefined) {
-        e.preventDefault(); // Stop native scroll so our animator takes over
+        e.preventDefault();
         triggerCinematicScroll(nextProg);
     }
 }, { passive: false });
@@ -508,8 +551,8 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
             e.preventDefault();
             triggerCinematicScroll(CINEMATIC_CONFIG.milestones[1]); // 50%
         } else if (href === '#hero-section') {
-             e.preventDefault();
-             triggerCinematicScroll(0);
+            e.preventDefault();
+            triggerCinematicScroll(0);
         }
     });
 });

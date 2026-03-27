@@ -635,7 +635,7 @@ header.warm .nav-links a:hover {
 
 /* ── Gathering Section ── */
 #gathering-section {
-    height: 60vh;
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -648,7 +648,11 @@ header.warm .nav-links a:hover {
 
 /* ── Content Sections ── */
 .content-section {
-    padding: 120px 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px 0;
     position: relative;
 }
 
